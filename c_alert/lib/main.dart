@@ -13,6 +13,8 @@ import 'home.dart';
 import 'more_info.dart';
 import 'previous_tests.dart';
 import 'bluetooth_scan.dart';
+import 'detailspage.dart';
+import 'result.dart';
 
 void main(){
   runApp(MyApp());
@@ -84,6 +86,13 @@ class MyApp extends StatelessWidget {
             ),
           ),
         ]
+          ),
+          GoRoute(
+            path: 'result',
+            builder: (context, state) => Nav(
+              child: const ResultPage(),
+              currentIndex: 0,
+            ),
           ),
           GoRoute(
             path: 'view_all_previous_tests',
@@ -161,6 +170,16 @@ class MyApp extends StatelessWidget {
               child: const BluetoothScan(),
               currentIndex: 0,
         ),
+      ),
+      GoRoute(
+        path: '/detail',
+        builder: (context, state) {
+          final server = state.extra as BluetoothDevice;
+          return Nav(
+            child : DetailPage(server: server),
+            currentIndex: 0,
+            );
+        },
       ),
       // GoRoute(
       //       path: '/dashboard',

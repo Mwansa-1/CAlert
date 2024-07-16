@@ -1,3 +1,4 @@
+import 'package:c_alert/detailspage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
 import 'BluetoothDeviceListEntry.dart';
@@ -152,6 +153,7 @@ class _BluetoothScanState extends State<BluetoothScan> with WidgetsBindingObserv
                                 enabled: true,
                                 onTap: () {
                                   print("Item tapped: ${_device.name}");
+                                  _startCameraConnect(context, _device);
                                 },
                               ))
                           .toList(),
@@ -161,5 +163,10 @@ class _BluetoothScanState extends State<BluetoothScan> with WidgetsBindingObserv
         ),
       ),
     );
+  }
+
+  void _startCameraConnect(BuildContext context , BluetoothDevice server){
+    context.go('/detail', extra: server);
+
   }
 }
