@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 
 class ResultPage extends StatefulWidget {
   const ResultPage({super.key});
@@ -13,33 +15,109 @@ class _ResultPageState extends State<ResultPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // Background color of the app
+      backgroundColor: Colors.grey[100],
       appBar: AppBar(
-        title: const Text('Test Results'),
+        shadowColor: Colors.black,
+        title: Text(
+          "Test Results",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        centerTitle: true,
+        backgroundColor: Colors.white,
+        elevation: 5.5,
+        actions: [
+          IconButton(
+            onPressed: () => GoRouter.of(context).go('/view_all_previous_tests'),
+            icon: Icon(Icons.science_outlined)
+          ),
+          PopupMenuButton<String>(
+            onSelected: (String value) {
+              switch (value) {
+                case 'New Test':
+                  context.go("/new_test");
+                  break;
+                case 'Language':
+                  // Handle Language change here
+                  break;
+                case 'Settings':
+                  // Navigate to Settings page
+                  break;
+                case 'Sign In':
+                  context.go('/login');
+                  break;
+              }
+            },
+            itemBuilder: (BuildContext context) {
+              return {'New Test', 'Language', 'Settings', 'Sign In'}.map((String choice) {
+                return PopupMenuItem<String>(
+                  value: choice,
+                  child: Text(choice),
+                );
+              }).toList();
+            },
+            icon: Icon(Icons.more_vert),
+          ),
+        ],
       ),
+
+      // Floating action button
+      floatingActionButton: SpeedDial(
+        elevation: 5.0,
+        backgroundColor: Colors.grey[800],
+        child: Icon(
+          Icons.add,
+          color: Colors.white,
+        ),
+        children: [
+          SpeedDialChild(
+            onTap: () {
+              context.go("/new_test");
+            },
+            child: Icon(Icons.paste_rounded, color: Colors.white),
+            label: "New Test With Device",
+            backgroundColor: Colors.grey[800],
+            labelBackgroundColor: Colors.grey[800],
+            labelStyle: TextStyle(
+              color: Colors.white,
+              fontSize: 15.0,
+            ),
+          ),
+        ],
+      ),
+
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+        padding: EdgeInsets.fromLTRB(40.0, 40.0, 40.0, 0.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Title',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            // const Text(
+            //   'Cholera Detection Test',
+            //   style: TextStyle(
+            //     fontSize: 24,
+            //     fontWeight: FontWeight.bold,
+            //     color: Colors.black,
+            //   ),
+            // ),
             const SizedBox(height: 16),
-            const Text(
-              'Results',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
+            _buildCard(
+              title: 'Results',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    'Positive',
+                    style: TextStyle(fontSize: 16, color: Colors.green),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Quantitative Analysis: High level of contamination detected.',
+                    style: TextStyle(fontSize: 16),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Positive or Negative Projections',
-              style: TextStyle(fontSize: 16),
             ),
             const SizedBox(height: 16),
             Center(
@@ -49,34 +127,58 @@ class _ResultPageState extends State<ResultPage> {
                     _showDetailedResults = !_showDetailedResults;
                   });
                 },
+                style: ElevatedButton.styleFrom(
+                  primary: Colors.white,
+                ),
                 child: Text(_showDetailedResults ? 'Show Less' : 'Show More'),
               ),
             ),
             if (_showDetailedResults) ...[
               const SizedBox(height: 16),
-              const Text(
-                'Method',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
+              _buildCard(
+                title: 'Methodology',
+                child: _buildMethodSection(),
               ),
-              const SizedBox(height: 8),
-              _buildMethodSection(),
-              const SizedBox(height: 16),
-              const Text(
-                'Quantitative Analysis',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'The degree of the contamination.',
-                style: TextStyle(fontSize: 16),
-              ),
+              SizedBox(height: 20.0,)
             ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCard({required String title, required Widget child}) {
+    return Container(
+      
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            spreadRadius: 0.0,
+            blurRadius: 1.0,
+            offset: Offset(0, 1),
+          )
+        ],
+        borderRadius: BorderRadius.circular(10.0)
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            child,
           ],
         ),
       ),
@@ -88,53 +190,53 @@ class _ResultPageState extends State<ResultPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: const [
         Text(
-          'What test did you use?',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          'Test Used',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
         ),
         SizedBox(height: 4),
-        Text('Description of the test.'),
+        Text('Rapid Cholera Detection Test', style: TextStyle(color: Colors.black)),
         SizedBox(height: 8),
         Text(
-          'What is the purpose of the method?',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          'Purpose of the Test',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
         ),
         SizedBox(height: 4),
-        Text('Purpose of the method.'),
+        Text('To quickly identify the presence of cholera bacteria.', style: TextStyle(color: Colors.black)),
         SizedBox(height: 8),
         Text(
-          'What is the principle of the method?',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          'Principle of the Method',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
         ),
         SizedBox(height: 4),
-        Text('Principle of the method.'),
+        Text('The test detects cholera bacteria through antigen-antibody reactions.', style: TextStyle(color: Colors.black)),
         SizedBox(height: 8),
         Text(
-          'What are some of the limitations of the results?',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          'Limitations of the Test',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
         ),
         SizedBox(height: 4),
-        Text('Limitations of the results.'),
+        Text('Can only detect 01 and 130 serotypes of Vibrio Cholerae.', style: TextStyle(color: Colors.black)),
         SizedBox(height: 8),
         Text(
           'How was the test done?',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
         ),
         SizedBox(height: 4),
-        Text('Description of the test procedure.'),
+        Text('A sample was taken and analyzed using the automated rapid detection kit.', style: TextStyle(color: Colors.black)),
         SizedBox(height: 8),
         Text(
-          'What is the sensitivity?',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          'Sensitivity',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
         ),
         SizedBox(height: 4),
-        Text('Sensitivity details.'),
+        Text('High sensitivity (95%)', style: TextStyle(color: Colors.black)),
         SizedBox(height: 8),
         Text(
-          'What is the specificity?',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-        ),
+          'Specificity?',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black)),
         SizedBox(height: 4),
-        Text('Specificity details.'),
+        Text('High specificity (98%)', style: TextStyle(color: Colors.black)),
+        
       ],
     );
   }
