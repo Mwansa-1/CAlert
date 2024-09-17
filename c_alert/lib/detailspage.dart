@@ -1,10 +1,10 @@
-import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:async/async.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
-import 'package:go_router/go_router.dart';
+import 'package:photo_view/photo_view.dart';
 
 class DetailPage extends StatefulWidget {
   final BluetoothDevice server;
@@ -12,28 +12,29 @@ class DetailPage extends StatefulWidget {
   const DetailPage({required this.server});
 
   @override
-  State<DetailPage> createState() => _DetailPageState();
+  _DetailPageState createState() => _DetailPageState();
 }
 
 class _DetailPageState extends State<DetailPage> {
   BluetoothConnection? connection;
   bool isConnecting = true;
+
   bool get isConnected => connection != null && connection!.isConnected;
   bool isDisconnecting = false;
-  late Timer _connectionTimeoutTimer;
 
-  String _selectFrameSize = '1';
+  String _selectedFrameSize = '0';
 
   List<List<int>> chunks = <List<int>>[];
   int contentLength = 0;
-  late Uint8List _bytes;
+  Uint8List? _bytes;
 
+  RestartableTimer? _timer;
 
   @override
   void initState() {
     super.initState();
     _getBTConnection();
-    _selectFrameSize;
+    _timer = RestartableTimer(Duration(seconds: 1), _drawImage);
   }
 
   @override
@@ -42,67 +43,72 @@ class _DetailPageState extends State<DetailPage> {
       isDisconnecting = true;
       connection?.dispose();
     }
-    _connectionTimeoutTimer.cancel();
+    _timer?.cancel();
     super.dispose();
   }
 
-  void _getBTConnection() {
-    print('Attempting to connect to ${widget.server.address}');
-    
-    // Start a timer to handle connection timeout
-    _connectionTimeoutTimer = Timer(Duration(seconds: 15), () {
-      if (isConnecting) {
-        print('Connection timed out');
-        setState(() {
-          isConnecting = false;
-        });
-        GoRouter.of(context).go('/bluetooth_scan');
-      }
-    });
-
+  _getBTConnection() {
     BluetoothConnection.toAddress(widget.server.address).then((_connection) {
-      print('Connected to the device');
       connection = _connection;
-      isConnecting = false;
-      isDisconnecting = false;
-      setState(() {});
-      _connectionTimeoutTimer.cancel();  // Cancel the timeout timer on successful connection
-      connection!.input?.listen(_onDataReceived).onDone(() {
-        if (isDisconnecting) {
-          print("Disconnecting locally");
-        } else {
-          print("Disconnected remotely");
-        }
-        if (this.mounted) {
-          setState(() {});
-        }
-        GoRouter.of(context).go('/bluetooth_scan');
-      });
-    }).catchError((error) {
-      print('Cannot connect, exception occurred: $error');
       setState(() {
         isConnecting = false;
+        isDisconnecting = false;
       });
-      _connectionTimeoutTimer.cancel();  // Cancel the timeout timer on failure
-      GoRouter.of(context).go('/bluetooth_scan');
+      connection!.input!.listen(_onDataReceived).onDone(() {
+        if (isDisconnecting) {
+          print('Disconnecting locally');
+        } else {
+          print('Disconnecting remotely');
+        }
+        if (mounted) {
+          setState(() {});
+        }
+        Navigator.of(context).pop();
+      });
+    }).catchError((error) {
+      Navigator.of(context).pop();
     });
+  }
+
+  _drawImage() {
+    if (chunks.isEmpty || contentLength == 0) return;
+
+    _bytes = Uint8List(contentLength);
+    int offset = 0;
+    for (final List<int> chunk in chunks) {
+      _bytes!.setRange(offset, offset + chunk.length, chunk);
+      offset += chunk.length;
+    }
+
+    setState(() {});
+
+    // Show message (you can replace this with a custom loader if needed)
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Downloaded image")),
+    );
+
+    contentLength = 0;
+    chunks.clear();
   }
 
   void _onDataReceived(Uint8List data) {
-    if(data != null && data.length > 0){
-      chunks.add(data);
-      contentLength += data.length;
-    }
-    // Handle the received data
-    print('Data received: $data , chunks: ${chunks.length}');
+    chunks.add(data);
+    contentLength += data.length;
+    _timer?.reset();
+    print(data);
   }
 
-  void _sendMessage(String text) async{
+  void _sendMessage(String text) async {
     text = text.trim();
-    if(text.length > 0){
-      try{
+    if (text.isNotEmpty) {
+      try {
         connection?.output.add(utf8.encode(text));
-      }catch(e){
+        // Show loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Requesting...")),
+        );
+        await connection?.output.allSent;
+      } catch (e) {
         setState(() {});
       }
     }
@@ -111,28 +117,103 @@ class _DetailPageState extends State<DetailPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.black,
       appBar: AppBar(
         title: isConnecting
-            ? Text("Connecting to ${widget.server.name}...")
+            ? Text('Connecting to ${widget.server.name} ...')
             : isConnected
-                ? Text("Connected with ${widget.server.name}...")
-                : Text("Disconnected with ${widget.server.name}"),
+                ? Text('Connected with ${widget.server.name}')
+                : Text('Disconnected with ${widget.server.name}'),
       ),
       body: SafeArea(
         child: isConnected
             ? Column(
                 children: <Widget>[
-                  TextButton(
-                    onPressed: () {
-                      _sendMessage(_selectFrameSize);
-                    },
-                    child: Text("Take a shot"),
-                  ),
+                  selectFrameSize(),
+                  shotButton(),
+                  photoFrame(),
                 ],
               )
             : Center(
-                child: Text("Connecting..."),
+                child: Text(
+                  "Connecting...",
+                  style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white),
+                ),
               ),
+      ),
+    );
+  }
+
+  Widget photoFrame() {
+    return Expanded(
+      child: Container(
+        width: double.infinity,
+        child: _bytes != null
+            ? PhotoView(
+                enableRotation: true,
+                initialScale: PhotoViewComputedScale.covered,
+                maxScale: PhotoViewComputedScale.covered * 2.0,
+                minScale: PhotoViewComputedScale.contained * 0.8,
+                imageProvider: MemoryImage(_bytes!),
+              )
+            : Container(),
+      ),
+    );
+  }
+
+  Widget shotButton() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.red,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+            side: BorderSide(color: Colors.red),
+          ),
+        ),
+        onPressed: () async {
+          for (int i = 0; i < 4; i++) {
+            _sendMessage(_selectedFrameSize);
+            await Future.delayed(Duration(seconds: 10));
+          }
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Text(
+            'TAKE A SHOT',
+            style: TextStyle(fontSize: 24),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget selectFrameSize() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.all(16),
+      child: DropdownButtonFormField<String>(
+        decoration: InputDecoration(
+          labelText: 'FRAMESIZE',
+          hintText: 'Please choose one',
+        ),
+        value: _selectedFrameSize,
+        onChanged: (value) {
+          setState(() {
+            _selectedFrameSize = value!;
+          });
+        },
+        items: [
+          DropdownMenuItem(value: "4", child: Text("1600x1200")),
+          DropdownMenuItem(value: "3", child: Text("1280x1024")),
+          DropdownMenuItem(value: "2", child: Text("1024x768")),
+          DropdownMenuItem(value: "1", child: Text("800x600")),
+          DropdownMenuItem(value: "0", child: Text("640x480")),
+        ],
       ),
     );
   }
